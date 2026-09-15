@@ -8,7 +8,8 @@ data "aws_ami" "ubuntu" {
   }
 }
 resource "aws_security_group" "app_sg" {
-  name        = "flask-app-sg"
+  name       
+   = "flask-app-sg"
   description = "Allow SSH and app traffic"
 
   ingress {
@@ -32,5 +33,16 @@ resource "aws_security_group" "app_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_instance" "app" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.instance_type
+  key_name               = var.key_name
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
+  user_data              = file("${path.module}/scripts/user_data.sh")
+
+  tags = {
+    Name = "terraform-flask-deploy"
   }
 }
