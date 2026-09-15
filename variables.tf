@@ -9,8 +9,8 @@ variable "key_name" {
   type = string
 }
 
-varible "allowed_ssh_cdir" {
+variable "allowed_ssh_cidr" {
   description = "CIDR block allowed to SSH into the instance"
-  type = string
+  type    = string
   default = "0.0.0.0/0"
 }

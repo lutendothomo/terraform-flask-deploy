@@ -8,8 +8,7 @@ data "aws_ami" "ubuntu" {
   }
 }
 resource "aws_security_group" "app_sg" {
-  name       
-   = "flask-app-sg"
+  name        = "flask-app-sg"
   description = "Allow SSH and app traffic"
 
   ingress {
