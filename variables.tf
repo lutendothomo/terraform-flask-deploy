@@ -4,11 +4,6 @@
   default = "t3.micro"
 }
 
-variable "key_name" {
-  description = "Name of an existing EC2 key for SSH access"
-  type = string
-}
-
 variable "allowed_ssh_cidr" {
   description = "CIDR block allowed to SSH into the instance"
   type    = string

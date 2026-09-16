@@ -34,10 +34,15 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+resource "aws_key_pair" "deploy_key" {
+  key_name   = "flask-deploy-key-tf"
+  public_key = file(pathexpand("~/.ssh/tf_flask_key.pub"))
+}
+
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
-  key_name               = var.key_name
+  key_name               = aws_key_pair.deploy_key.key_name
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   user_data              = file("${path.module}/scripts/user_data.sh")
 
