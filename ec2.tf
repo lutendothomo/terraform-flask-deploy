@@ -34,9 +34,13 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+resource "tls_private_key" "deploy_key" {
+  algorithm = "ED25519"
+}
+
 resource "aws_key_pair" "deploy_key" {
   key_name   = "flask-deploy-key-tf"
-  public_key = file(pathexpand("~/.ssh/tf_flask_key.pub"))
+  public_key = tls_private_key.deploy_key.public_key_openssh
 }
 
 resource "aws_instance" "app" {
