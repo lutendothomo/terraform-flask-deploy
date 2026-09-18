@@ -54,3 +54,18 @@ resource "aws_instance" "app" {
     Name = "terraform-flask-deploy"
   }
 }
+resource "aws_cloudwatch_metric_alarm" "status_check" {
+  alarm_name          = "flask-app-status-check-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "StatusCheckFailed"
+  namespace           = "AWS/EC2"
+  period              = 300
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "Triggers if the instance fails an AWS status check"
+
+  dimensions = {
+    InstanceId = aws_instance.app.id
+  }
+}
