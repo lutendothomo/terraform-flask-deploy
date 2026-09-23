@@ -3,10 +3,7 @@
   value       = aws_instance.app.public_ip
 }
 
-variable "key_name" {
-  description = "Name of the AWS EC2 key pair to use for the instance"
-  type        = string
-}
+
 
 output "ssh_private_key" {
   description = "SSH private key for the Terraform-managed deploy key pair (sensitive). Extract with: terraform output -raw ssh_private_key > ~/.ssh/tf_flask_key && chmod 600 ~/.ssh/tf_flask_key"
