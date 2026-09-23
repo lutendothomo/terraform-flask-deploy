@@ -1,6 +1,11 @@
-output "instance_public_ip" {
+﻿output "instance_public_ip" {
   description = "Public IP of the app server"
   value       = aws_instance.app.public_ip
+}
+
+variable "key_name" {
+  description = "Name of the AWS EC2 key pair to use for the instance"
+  type        = string
 }
 
 output "ssh_private_key" {
