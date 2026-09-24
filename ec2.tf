@@ -19,6 +19,10 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = [var.allowed_ssh_cidr]
   }
 
+  # tfsec:ignore:aws-ec2-no-public-ingress-sgr
+  # This is a public web app on port 5000 -- open ingress here is the
+  # intended design, not an oversight. SSH above stays locked to a
+  # single IP via var.allowed_ssh_cidr.
   ingress {
     description = "Flask app"
     from_port   = 5000
@@ -27,7 +31,11 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # tfsec:ignore:aws-ec2-no-public-egress-sgr
+  # Outbound internet is required for user_data.sh (apt-get, git clone,
+  # pip install) to bootstrap the instance on first boot.
   egress {
+    description = "Allow all outbound traffic (required for apt/git/pip during bootstrap)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -50,6 +58,14 @@ resource "aws_instance" "app" {
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   user_data              = file("${path.module}/scripts/user_data.sh")
 
+  metadata_options {
+    http_tokens = "required"
+  }
+
+  root_block_device {
+    encrypted = true
+  }
+
   tags = {
     Name = "terraform-flask-deploy"
   }
@@ -67,13 +83,5 @@ resource "aws_cloudwatch_metric_alarm" "status_check" {
 
   dimensions = {
     InstanceId = aws_instance.app.id
-  }
-}
-resource "aws_eip" "app" {
-  instance = aws_instance.app.id
-  domain   = "vpc"
-
-  tags = {
-    Name = "terraform-flask-deploy-eip"
   }
 }
