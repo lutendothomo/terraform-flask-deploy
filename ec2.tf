@@ -69,3 +69,11 @@ resource "aws_cloudwatch_metric_alarm" "status_check" {
     InstanceId = aws_instance.app.id
   }
 }
+resource "aws_eip" "app" {
+  instance = aws_instance.app.id
+  domain   = "vpc"
+
+  tags = {
+    Name = "terraform-flask-deploy-eip"
+  }
+}
