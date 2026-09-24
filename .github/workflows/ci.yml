@@ -25,6 +25,9 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      -name: Run tfsec
+        usess: aquasecurity/tfsec-action@v1
+
   plan:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
