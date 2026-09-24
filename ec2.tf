@@ -19,10 +19,10 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = [var.allowed_ssh_cidr]
   }
 
-  # tfsec:ignore:aws-ec2-no-public-ingress-sgr
   # This is a public web app on port 5000 -- open ingress here is the
   # intended design, not an oversight. SSH above stays locked to a
   # single IP via var.allowed_ssh_cidr.
+  #tfsec:ignore:aws-ec2-no-public-ingress-sgr
   ingress {
     description = "Flask app"
     from_port   = 5000
@@ -31,9 +31,9 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # tfsec:ignore:aws-ec2-no-public-egress-sgr
   # Outbound internet is required for user_data.sh (apt-get, git clone,
   # pip install) to bootstrap the instance on first boot.
+  #tfsec:ignore:aws-ec2-no-public-egress-sgr
   egress {
     description = "Allow all outbound traffic (required for apt/git/pip during bootstrap)"
     from_port   = 0
