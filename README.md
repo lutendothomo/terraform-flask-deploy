@@ -19,7 +19,7 @@ terraform-flask-deploy/
 │   └── user_data.sh           # EC2 bootstrap script (installs deps, starts app as a systemd service)
 ├── main.tf                    # Terraform + provider + S3 backend config
 ├── variables.tf                # Input variables (region, instance_type, allowed_ssh_cidr)
-├── ec2.tf                      # Key pair, security group, EC2 instance, CloudWatch alarm, Elastic IP
+├── ec2.tf                      # Key pair, security group, EC2 instance, CloudWatch alarm
 ├── outputs.tf                  # Outputs: instance_public_ip, ssh_private_key
 ├── .gitignore                  # Excludes *.pem, *.tfstate, .terraform/
 └── README.md
@@ -31,9 +31,7 @@ Terraform provisions:
 
 - **EC2 instance** (`t3.micro`, Ubuntu 22.04) running the Flask app via
   `gunicorn`, bootstrapped with `scripts/user_data.sh`
-- **Elastic IP** attached to the instance, so the public address stays
-  stable across `apply` runs (rather than changing every time the
-  instance is replaced)
+
 - **Security group** (`flask-app-sg`) allowing:
   - SSH (port 22) from a single restricted IP (`var.allowed_ssh_cidr`)
   - App traffic (port 5000) from anywhere
@@ -127,8 +125,7 @@ ssh -i tf_key.pem ubuntu@$(terraform output -raw instance_public_ip)
 terraform destroy
 ```
 
-Run this when you're done demoing/grading — the instance and Elastic
-IP incur cost (or consume AWS Educate credits) while running.
+
 
 ## Known limitations
 
