@@ -1,3 +1,5 @@
+#should work
+
 name: Terraform CI
 
 on:
