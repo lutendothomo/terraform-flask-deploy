@@ -52,11 +52,19 @@ resource "aws_key_pair" "deploy_key" {
 }
 
 resource "aws_instance" "app" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  key_name               = aws_key_pair.deploy_key.key_name
-  vpc_security_group_ids = [aws_security_group.app_sg.id]
-  user_data              = file("${path.module}/scripts/user_data.sh")
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  key_name                    = aws_key_pair.deploy_key.key_name
+  vpc_security_group_ids      = [aws_security_group.app_sg.id]
+  associate_public_ip_address = true
+  user_data_replace_on_change = true
+
+  user_data = <<-EOF
+    #!/bin/bash
+    # App code hash: ${filesha256("${path.module}/app/app.py")}
+    # Requirements hash: ${filesha256("${path.module}/app/requirements.txt")}
+    ${file("${path.module}/scripts/user_data.sh")}
+  EOF
 
   metadata_options {
     http_tokens = "required"
