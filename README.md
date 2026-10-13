@@ -1,4 +1,4 @@
-﻿# terraform-flask-deploy
+# terraform-flask-deploy
 
 TRACK-ID = WTC-7VDYR8L3
 
@@ -13,17 +13,19 @@ stays consistent across CI runs.
 terraform-flask-deploy/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml            # CI/CD pipeline: validate -> plan -> apply
+│       └── ci.yml            # CI/CD pipeline: test-app -> validate -> plan -> apply
 ├── app/
 │   ├── app.py                 # Flask application
 │   └── requirements.txt       # Python dependencies (Flask, gunicorn)
+├── tests/
+│   └── test_app.py            # Unit tests for Flask endpoints
 ├── scripts/
 │   └── user_data.sh           # EC2 bootstrap script (installs deps, starts app as a systemd service)
 ├── main.tf                    # Terraform + provider + S3 backend config
 ├── variables.tf                # Input variables (region, instance_type, allowed_ssh_cidr)
 ├── ec2.tf                      # Key pair, security group, EC2 instance, CloudWatch alarm
 ├── outputs.tf                  # Outputs: instance_public_ip, ssh_private_key
-├── .gitignore                  # Excludes *.pem, *.tfstate, .terraform/
+├── .gitignore                  # Excludes *.pem, *.tfstate, .terraform/, Python artifacts
 └── README.md
 ```
 
@@ -84,17 +86,23 @@ Under **Settings → Secrets and variables → Actions**, add:
 
 ## CI/CD pipeline (`.github/workflows/ci.yml`)
 
-Three jobs:
+The pipeline includes a concurrency lock to prevent overlapping runs and consists of four jobs:
 
-1. **`validate`** — runs on every push and pull request. Checks
+1. **`test-app`** — runs on every push and pull request. Sets up Python,
+   installs dependencies from `app/requirements.txt`, and runs unit tests
+   via `pytest` in `tests/test_app.py`.
+2. **`validate`** — runs on every push and pull request. Checks
    `terraform fmt`, runs `terraform init -backend=false` (syntax-only,
-   no AWS/S3 access needed), and `terraform validate`.
-2. **`plan`** — runs only on pull requests. Initializes against the
-   real S3 backend and shows the proposed infrastructure diff before
-   merging.
-3. **`apply`** — runs only on a direct push to `main`. Initializes
-   against the S3 backend and actually provisions/updates the
-   infrastructure.
+   no AWS/S3 access needed), `terraform validate`, and static security
+   checks via `tfsec`.
+3. **`plan`** — runs only on pull requests (after `validate` and `test-app`
+   pass). Initializes against the real S3 backend and shows the proposed
+   infrastructure diff before merging.
+4. **`apply`** — runs only on a direct push to `main` (after `validate`
+   and `test-app` pass). Initializes against the S3 backend and provisions
+   or updates the infrastructure. Application updates automatically trigger
+   instance replacement via `user_data_replace_on_change` and app SHA-256
+   checksum hashing.
 
 ## Deploying manually (local machine)
 
