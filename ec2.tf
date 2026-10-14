@@ -7,8 +7,9 @@ data "aws_ami" "ubuntu" {
     values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 }
+
 resource "aws_security_group" "app_sg" {
-  name        = "flask-app-sg"
+  name_prefix = "flask-app-sg-"
   description = "Allow SSH and app traffic"
 
   ingress {
@@ -35,20 +36,25 @@ resource "aws_security_group" "app_sg" {
   # pip install) to bootstrap the instance on first boot.
   #tfsec:ignore:aws-ec2-no-public-egress-sgr
   egress {
-    description = "Allow all outbound traffic (required for apt/git/pip during bootstrap)"
+    description = "Allow all outbound traffic (required for apt/pip during bootstrap)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
+
 resource "tls_private_key" "deploy_key" {
   algorithm = "ED25519"
 }
 
 resource "aws_key_pair" "deploy_key" {
-  key_name   = "flask-deploy-key-tf"
-  public_key = tls_private_key.deploy_key.public_key_openssh
+  key_name_prefix = "flask-deploy-key-"
+  public_key      = tls_private_key.deploy_key.public_key_openssh
 }
 
 resource "aws_instance" "app" {
@@ -59,12 +65,10 @@ resource "aws_instance" "app" {
   associate_public_ip_address = true
   user_data_replace_on_change = true
 
-  user_data = <<-EOF
-    #!/bin/bash
-    # App code hash: ${filesha256("${path.module}/app/app.py")}
-    # Requirements hash: ${filesha256("${path.module}/app/requirements.txt")}
-    ${file("${path.module}/scripts/user_data.sh")}
-  EOF
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    app_code          = file("${path.module}/app/app.py")
+    requirements_code = file("${path.module}/app/requirements.txt")
+  })
 
   metadata_options {
     http_tokens = "required"
@@ -78,6 +82,7 @@ resource "aws_instance" "app" {
     Name = "terraform-flask-deploy"
   }
 }
+
 resource "aws_cloudwatch_metric_alarm" "status_check" {
   alarm_name          = "flask-app-status-check-failed"
   comparison_operator = "GreaterThanThreshold"
@@ -92,4 +97,6 @@ resource "aws_cloudwatch_metric_alarm" "status_check" {
   dimensions = {
     InstanceId = aws_instance.app.id
   }
+
+  alarm_actions = var.alarm_actions
 }

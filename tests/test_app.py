@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Ensure repository root is on sys.path when running this file directly
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import unittest
 from app.app import app
 

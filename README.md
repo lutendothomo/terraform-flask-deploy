@@ -15,16 +15,20 @@ terraform-flask-deploy/
 │   └── workflows/
 │       └── ci.yml            # CI/CD pipeline: test-app -> validate -> plan -> apply
 ├── app/
+│   ├── __init__.py            # Python package marker
 │   ├── app.py                 # Flask application
-│   └── requirements.txt       # Python dependencies (Flask, gunicorn)
+│   └── requirements.txt       # Production dependencies (Flask, gunicorn)
 ├── tests/
+│   ├── __init__.py            # Python package marker
 │   └── test_app.py            # Unit tests for Flask endpoints
 ├── scripts/
 │   └── user_data.sh           # EC2 bootstrap script (installs deps, starts app as a systemd service)
+├── requirements-dev.txt       # Development & testing dependencies (pytest)
+├── .gitattributes             # Enforces LF line endings across platforms
 ├── main.tf                    # Terraform + provider + S3 backend config
-├── variables.tf                # Input variables (region, instance_type, allowed_ssh_cidr)
+├── variables.tf                # Input variables (region, instance_type, allowed_ssh_cidr, alarm_actions)
 ├── ec2.tf                      # Key pair, security group, EC2 instance, CloudWatch alarm
-├── outputs.tf                  # Outputs: instance_public_ip, ssh_private_key
+├── outputs.tf                  # Outputs: instance_public_ip, app_url, ssh_private_key
 ├── .gitignore                  # Excludes *.pem, *.tfstate, .terraform/, Python artifacts
 └── README.md
 ```
@@ -34,12 +38,13 @@ terraform-flask-deploy/
 Terraform provisions:
 
 - **EC2 instance** (`t3.micro`, Ubuntu 22.04) running the Flask app via
-  `gunicorn`, bootstrapped with `scripts/user_data.sh`
+  `gunicorn`, bootstrapped with `scripts/user_data.sh` using Terraform's
+  `templatefile` to directly inject application code into the instance.
 
-- **Security group** (`flask-app-sg`) allowing:
+- **Security group** (`flask-app-sg-*`) allowing:
   - SSH (port 22) from a single restricted IP (`var.allowed_ssh_cidr`)
   - App traffic (port 5000) from anywhere
-- **Auto-generated SSH key pair** (`flask-deploy-key-tf`, via the `tls`
+- **Auto-generated SSH key pair** (`flask-deploy-key-*`, via the `tls`
   provider) — no manual key upload needed; the private key is available
   as a sensitive Terraform output
 - **CloudWatch alarm** (`flask-app-status-check-failed`) that triggers
@@ -84,13 +89,28 @@ Under **Settings → Secrets and variables → Actions**, add:
 
 (values from the IAM user created in step 1)
 
+## Running Tests Locally
+
+You can run the test suite with either standard Python unittest or pytest:
+
+```bash
+# Using standard Python unittest (no extra install needed):
+python -m unittest discover -s tests -p "test_*.py"
+# or run the test file directly:
+python tests/test_app.py
+
+# Using pytest:
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
 ## CI/CD pipeline (`.github/workflows/ci.yml`)
 
-The pipeline includes a concurrency lock to prevent overlapping runs and consists of four jobs:
+The pipeline includes a concurrency lock to prevent overlapping runs on the shared remote state and consists of four jobs:
 
 1. **`test-app`** — runs on every push and pull request. Sets up Python,
-   installs dependencies from `app/requirements.txt`, and runs unit tests
-   via `pytest` in `tests/test_app.py`.
+   installs dependencies from `requirements-dev.txt`, and runs unit tests
+   via `pytest` in `tests/`.
 2. **`validate`** — runs on every push and pull request. Checks
    `terraform fmt`, runs `terraform init -backend=false` (syntax-only,
    no AWS/S3 access needed), `terraform validate`, and static security
@@ -101,8 +121,8 @@ The pipeline includes a concurrency lock to prevent overlapping runs and consist
 4. **`apply`** — runs only on a direct push to `main` (after `validate`
    and `test-app` pass). Initializes against the S3 backend and provisions
    or updates the infrastructure. Application updates automatically trigger
-   instance replacement via `user_data_replace_on_change` and app SHA-256
-   checksum hashing.
+   instance replacement via `user_data_replace_on_change` as the injected
+   application template content changes.
 
 ## Deploying manually (local machine)
 
@@ -113,6 +133,12 @@ terraform apply
 ```
 
 Get the app's public address:
+
+```bash
+terraform output app_url
+```
+
+Or view the raw IP:
 
 ```bash
 terraform output instance_public_ip
@@ -135,8 +161,6 @@ ssh -i tf_key.pem ubuntu@$(terraform output -raw instance_public_ip)
 terraform destroy
 ```
 
-
-
 ## Known limitations
 
 - `allowed_ssh_cidr` must be updated manually if your IP changes
@@ -155,11 +179,8 @@ terraform destroy
 ## Troubleshooting notes (from real issues hit during development)
 
 - **`InvalidGroup.Duplicate` / `InvalidKeyPair.Duplicate` on `apply`**
-  — means Terraform's state doesn't match what's actually in AWS
-  (usually because state was local and got lost when a CI runner was
-  destroyed). Fix: ensure the S3 backend is configured, and manually
-  delete any orphaned AWS resources that don't exist in the current
-  state before re-applying.
+  — resolved by using `name_prefix` and `key_name_prefix` with
+  `create_before_destroy = true` so Terraform can swap security groups and keys safely.
 - **`403 Forbidden` reading state from S3** — the IAM user lacks S3
   permissions; attach `AmazonS3FullAccess` (or a scoped equivalent).
 - **`Error: Value for undeclared variable`** — a `-var` flag was

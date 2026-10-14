@@ -15,3 +15,9 @@ variable "allowed_ssh_cidr" {
   type        = string
   default     = "197.185.187.72/32"
 }
+
+variable "alarm_actions" {
+  description = "List of ARNs to execute when the CloudWatch status check alarm triggers (e.g. SNS topic ARN)"
+  type        = list(string)
+  default     = []
+}
